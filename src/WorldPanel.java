@@ -2,29 +2,55 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import javax.swing.JPanel;
+import javax.swing.Timer;
 
+/**
+ * Draws the world and drives the simulation clock.
+ */
 public class WorldPanel extends JPanel {
-    private final int columns;
-    private final int rows;
+    private static final int STEP_DELAY_MS = 120;
+    private static final Color BACKGROUND = new Color(24, 26, 28);
+
+    private final World world;
     private final int cellSize;
 
-    public WorldPanel(int columns, int rows, int cellSize) {
-        this.columns = columns;
-        this.rows = rows;
+    public WorldPanel(World world, int cellSize) {
+        this.world = world;
         this.cellSize = cellSize;
-        setPreferredSize(new Dimension(columns * cellSize, rows * cellSize));
-        setBackground(new Color(24, 26, 28));
+        setPreferredSize(new Dimension(world.getColumns() * cellSize, world.getRows() * cellSize));
+        setBackground(BACKGROUND);
+
+        Timer clock = new Timer(STEP_DELAY_MS, event -> {
+            world.step();
+            repaint();
+        });
+        clock.start();
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(new Color(52, 56, 60));
-        for (int col = 0; col <= columns; col++) {
-            g.drawLine(col * cellSize, 0, col * cellSize, rows * cellSize);
+        for (int row = 0; row < world.getRows(); row++) {
+            for (int column = 0; column < world.getColumns(); column++) {
+                Entity entity = world.getEntityAt(new Position(row, column));
+                if (entity != null) {
+                    g.setColor(entity.getColor());
+                    g.fillRect(column * cellSize, row * cellSize, cellSize, cellSize);
+                }
+            }
         }
-        for (int row = 0; row <= rows; row++) {
-            g.drawLine(0, row * cellSize, columns * cellSize, row * cellSize);
-        }
+        drawStatusLine(g);
+    }
+
+    /** A one-line readout of the current populations. */
+    private void drawStatusLine(Graphics g) {
+        String status = "step " + world.getStepCount()
+            + "    grass " + world.count(Grass.class)
+            + "    rabbits " + world.count(Rabbit.class)
+            + "    foxes " + world.count(Fox.class);
+        g.setColor(new Color(0, 0, 0, 170));
+        g.fillRect(0, 0, getWidth(), 22);
+        g.setColor(Color.WHITE);
+        g.drawString(status, 8, 16);
     }
 }
