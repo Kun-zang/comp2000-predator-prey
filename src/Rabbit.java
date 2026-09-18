@@ -1,4 +1,5 @@
 import java.awt.Color;
+import java.util.Optional;
 
 /**
  * Eats mature grass, breeds readily, and starves when the meadow is bare.
@@ -34,12 +35,15 @@ public class Rabbit extends Animal {
     /** Looks for mature grass nearby, eats it, and takes over its cell. */
     private boolean tryToEat(World world) {
         for (Position candidate : world.neighboursOf(getPosition())) {
-            Entity occupant = world.getEntityAt(candidate);
-            if (occupant instanceof Grass && ((Grass) occupant).isMature()) {
-                world.consume(occupant);
-                world.moveEntity(this, candidate);
-                changeEnergy(ENERGY_PER_GRASS);
-                return true;
+            Optional<Entity> occupant = world.entityAt(candidate);
+            if (occupant.isPresent() && occupant.get() instanceof Grass) {
+                Grass grass = (Grass) occupant.get();
+                if (grass.isMature()) {
+                    world.consume(grass);
+                    world.moveEntity(this, candidate);
+                    changeEnergy(ENERGY_PER_GRASS);
+                    return true;
+                }
             }
         }
         return false;

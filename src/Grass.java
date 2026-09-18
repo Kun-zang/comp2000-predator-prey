@@ -31,7 +31,7 @@ public class Grass extends Entity {
         }
         if (world.getRandom().nextDouble() < SPREAD_CHANCE) {
             for (Position candidate : world.neighboursOf(getPosition())) {
-                if (world.getEntityAt(candidate) == null) {
+                if (world.isEmpty(candidate)) {
                     world.place(new Grass(candidate));
                     return;
                 }
