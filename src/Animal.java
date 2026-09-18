@@ -40,7 +40,7 @@ public abstract class Animal extends Entity {
     protected void wander(World world) {
         List<Position> neighbours = world.neighboursOf(getPosition());
         for (Position candidate : neighbours) {
-            if (world.getEntityAt(candidate) == null) {
+            if (world.isEmpty(candidate)) {
                 world.moveEntity(this, candidate);
                 return;
             }
@@ -56,7 +56,7 @@ public abstract class Animal extends Entity {
             return;
         }
         for (Position candidate : world.neighboursOf(getPosition())) {
-            if (world.getEntityAt(candidate) == null) {
+            if (world.isEmpty(candidate)) {
                 int passedOn = energy / 2;
                 changeEnergy(-passedOn);
                 world.place(offspringAt(candidate, passedOn));

@@ -32,11 +32,12 @@ public class WorldPanel extends JPanel {
         super.paintComponent(g);
         for (int row = 0; row < world.getRows(); row++) {
             for (int column = 0; column < world.getColumns(); column++) {
-                Entity entity = world.getEntityAt(new Position(row, column));
-                if (entity != null) {
+                final int x = column * cellSize;
+                final int y = row * cellSize;
+                world.entityAt(new Position(row, column)).ifPresent(entity -> {
                     g.setColor(entity.getColor());
-                    g.fillRect(column * cellSize, row * cellSize, cellSize, cellSize);
-                }
+                    g.fillRect(x, y, cellSize, cellSize);
+                });
             }
         }
         drawStatusLine(g);

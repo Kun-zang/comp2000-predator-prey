@@ -1,4 +1,5 @@
 import java.awt.Color;
+import java.util.Optional;
 
 /**
  * Hunts rabbits. Costs more energy to run than a rabbit does, and often misses,
@@ -36,12 +37,12 @@ public class Fox extends Animal {
     /** Chases a neighbouring rabbit. The rabbit sometimes escapes. */
     private boolean tryToHunt(World world) {
         for (Position candidate : world.neighboursOf(getPosition())) {
-            Entity occupant = world.getEntityAt(candidate);
-            if (occupant instanceof Rabbit) {
+            Optional<Entity> occupant = world.entityAt(candidate);
+            if (occupant.isPresent() && occupant.get() instanceof Rabbit) {
                 if (world.getRandom().nextDouble() > CATCH_CHANCE) {
                     continue;
                 }
-                world.consume(occupant);
+                world.consume(occupant.get());
                 world.moveEntity(this, candidate);
                 changeEnergy(ENERGY_PER_RABBIT);
                 return true;
