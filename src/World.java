@@ -1,6 +1,7 @@
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Stream;
 
 /**
  * The world the simulation runs in. Owns the grid and advances time.
@@ -44,6 +45,11 @@ public class World {
 
     public boolean isEmpty(Position position) {
         return grid.isEmpty(position);
+    }
+
+    /** Every entity an animal at this position could see, up to the given distance away. */
+    public Stream<Entity> entitiesNear(Position position, int vision) {
+        return grid.occupantsWithin(position, vision);
     }
 
     public List<Position> neighboursOf(Position position) {
@@ -115,14 +121,21 @@ public class World {
         return total;
     }
 
-    /** Scatters a starting population across the grid. */
-    public void populate(double grassChance, double rabbitChance, double foxChance) {
+    /**
+     * Scatters a starting population across the grid. The movement strategies are
+     * handed in from outside, so the same World can be run with different behaviours.
+     *
+     * <p>This stays a plain loop on purpose: each cell needs exactly one random roll,
+     * taken in order, and the if/else chain reads more clearly than a stream would.</p>
+     */
+    public void populate(double grassChance, double rabbitChance, double foxChance,
+                         MovementStrategy rabbitMovement, MovementStrategy foxMovement) {
         for (Position position : grid.allPositions()) {
             double roll = random.nextDouble();
             if (roll < foxChance) {
-                place(new Fox(position));
+                place(new Fox(position, foxMovement));
             } else if (roll < foxChance + rabbitChance) {
-                place(new Rabbit(position));
+                place(new Rabbit(position, rabbitMovement));
             } else if (roll < foxChance + rabbitChance + grassChance) {
                 place(new Grass(position, 6));
             }

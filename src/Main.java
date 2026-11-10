@@ -16,7 +16,8 @@ public class Main {
             + " to repeat this run)");
 
         World world = new World(config.getRows(), config.getColumns(), config.getSeed());
-        world.populate(config.getGrassChance(), config.getRabbitChance(), config.getFoxChance());
+        world.populate(config.getGrassChance(), config.getRabbitChance(), config.getFoxChance(),
+            config.rabbitMovement(), config.foxMovement());
 
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("COMP2000 Predator-Prey Simulation");
