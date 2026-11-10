@@ -18,6 +18,18 @@ import java.util.stream.Stream;
 public class World {
     private static final double GRASS_REGROWTH_CHANCE = 0.05;
 
+    /**
+     * Grids with at least this many cells take their census in parallel. Timed with
+     * ParallelBenchmark on my machine, over two runs: at the default 30x40 grid (1,200
+     * cells, about 500 entities) a parallel census took 16 to 18 microseconds against 0.8
+     * sequentially, because splitting the work costs far more than the counting. At
+     * 100x150 (15,000 cells) the two were roughly even, with parallel slightly ahead in
+     * one run and slightly behind in the other. From 150x200 (30,000 cells) upwards
+     * parallel was clearly faster, and at 300x400 it took about 42 microseconds against
+     * 250 to 260. So 15,000 cells is where parallel stops costing anything.
+     */
+    private static final int PARALLEL_THRESHOLD = 15_000;
+
     private final Grid<Entity> grid;
     private final Random random;
     private final List<SimulationListener> listeners = new ArrayList<>();
@@ -144,36 +156,40 @@ public class World {
     }
 
     /**
-     * Counts everything on the grid, using a parallel stream and the custom
-     * Census collector.
+     * Counts everything on the grid with the custom Census collector, in parallel
+     * when the grid is big enough for that to pay off.
      *
-     * <p>Why this is thread-safe: it only runs between steps, when nothing is
-     * changing the grid, so the worker threads only ever read; each worker
+     * <p>Why the parallel version is thread-safe: it only runs between steps, when
+     * nothing is changing the grid, so the worker threads only ever read; each worker
      * accumulates into its own Tally (see Census.collector) and the partial results
      * are merged by the stream framework; and handing work to the fork/join pool
      * guarantees the workers see every change made before the census started.</p>
      */
     public Census census() {
-        return grid.stream()
-            .parallel()
-            .collect(Census.collector());
+        Stream<Entity> everyone = grid.stream();
+        if (grid.getRows() * grid.getColumns() >= PARALLEL_THRESHOLD) {
+            everyone = everyone.parallel();
+        }
+        return everyone.collect(Census.collector());
     }
 
     private void removeTheDead() {
-        for (Entity entity : grid.occupants()) {
-            if (!entity.isAlive()) {
-                grid.clear(entity.getPosition());
-            }
-        }
+        grid.occupants().stream()
+            .filter(entity -> !entity.isAlive())
+            .map(Entity::getPosition)
+            .forEach(grid::clear);
     }
 
-    /** Seed blows in: empty cells sometimes sprout new grass. */
+    /**
+     * Seed blows in: empty cells sometimes sprout new grass.
+     * Sequential on purpose: java.util.Random is shared, and the run must be
+     * repeatable from its seed, which needs the rolls to happen in a fixed order.
+     */
     private void regrowGrass() {
-        for (Position position : grid.allPositions()) {
-            if (grid.isEmpty(position) && random.nextDouble() < GRASS_REGROWTH_CHANCE) {
-                grid.put(new Grass(position), position);
-            }
-        }
+        grid.allPositions().stream()
+            .filter(grid::isEmpty)
+            .filter(position -> random.nextDouble() < GRASS_REGROWTH_CHANCE)
+            .forEach(position -> grid.put(new Grass(position), position));
     }
 
 
