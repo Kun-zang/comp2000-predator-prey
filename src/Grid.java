@@ -62,11 +62,21 @@ public class Grid<T extends Entity> {
         return contains(position) && at(position).isEmpty();
     }
 
-    /** Puts an occupant in a cell if that cell is inside the grid and empty. */
-    public void put(T occupant, Position position) {
-        if (isEmpty(position)) {
-            cells.set(indexOf(position), occupant);
+    /**
+     * Puts an occupant in a cell if that cell is empty.
+     *
+     * @return true if the occupant was placed, false if the cell was already taken
+     * @throws InvalidPositionException if the position is outside the grid
+     */
+    public boolean put(T occupant, Position position) {
+        if (!contains(position)) {
+            throw new InvalidPositionException(position, rows, columns);
         }
+        if (at(position).isPresent()) {
+            return false;
+        }
+        cells.set(indexOf(position), occupant);
+        return true;
     }
 
     public void clear(Position position) {

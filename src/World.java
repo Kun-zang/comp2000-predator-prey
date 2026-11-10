@@ -9,11 +9,16 @@ public class World {
     private static final double GRASS_REGROWTH_CHANCE = 0.05;
 
     private final Grid<Entity> grid;
-    private final Random random = new Random();
+    private final Random random;
     private int stepCount = 0;
 
-    public World(int rows, int columns) {
+    /**
+     * @param seed the seed for every random choice in the run, so that a run can be
+     *             repeated exactly by passing the same seed again
+     */
+    public World(int rows, int columns, long seed) {
         this.grid = new Grid<>(rows, columns);
+        this.random = new Random(seed);
     }
 
     public int getRows() {
