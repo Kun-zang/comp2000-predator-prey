@@ -34,6 +34,25 @@ Example: `java -cp out Main seed=42 rabbitmove=graze steps=2000 > run.csv`
 
 A bad setting is reported and the defaults are used instead.
 
+### Comparing behaviours
+
+`BehaviourExperiment` runs seeds 1..N without a window for one pairing of behaviours
+(runs are spread across CPU cores with a parallel stream):
+
+```
+java -cp out BehaviourExperiment cautious stalk 30 2000
+java -cp out BehaviourExperiment random stalk 30 2000
+```
+
+`RaceConditionDemo` shows the race condition that `Census.collector()` avoids: counting on a
+parallel stream with a shared `int` loses counts, while `AtomicInteger`, `synchronized` and the
+collector are always right (`java -cp out RaceConditionDemo`).
+
+`ParallelBenchmark` times the census sequentially and in parallel on grids of several sizes,
+which is what the census's parallel threshold is based on (`java -cp out ParallelBenchmark`).
+Add `sequential` after a `BehaviourExperiment` run to time it without parallelism, e.g.
+`java -cp out BehaviourExperiment cautious stalk 30 2000 sequential`.
+
 ## Design
 
 * **Entity hierarchy**: `Entity` → `Grass`, `Animal` → `Rabbit`, `Fox`.
@@ -43,5 +62,6 @@ A bad setting is reported and the defaults are used instead.
 * **Observer pattern**: `World` notifies `SimulationListener`s after each step with a
   `Census`. Observers: `WorldPanel`, `PopulationHistory`, `ExtinctionWatcher`,
   `CsvPopulationLogger`.
-* **Custom collector**: `Census.collector()`, run on a parallel stream for large grids.
-* **Checked exception**: `ConfigurationException` from `SimulationConfig.fromArgs`, caught in `Main`.
+* **Parallelism**: `Census.collector()` runs on a parallel stream for large grids; `BehaviourExperiment` runs seeds in parallel.
+* **Custom collector and groupingBy**: `Census.collector()` and `World.energyBySpecies()` (`groupingBy` + `summarizingDouble`).
+* **Exceptions**: checked `ConfigurationException` from `SimulationConfig.fromArgs`, caught in `Main`; unchecked `InvalidPositionException` from `Grid.put`.
