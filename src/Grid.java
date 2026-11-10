@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -95,13 +96,7 @@ public class Grid<T extends Entity> {
 
     /** Every occupant currently on the grid, in row order. */
     public List<T> occupants() {
-        List<T> found = new ArrayList<>();
-        for (T occupant : cells) {
-            if (occupant != null) {
-                found.add(occupant);
-            }
-        }
-        return found;
+        return stream().collect(Collectors.toList());
     }
 
     /**
@@ -109,41 +104,36 @@ public class Grid<T extends Entity> {
      * counting the cell itself. This is what an animal can "see".
      */
     public Stream<T> occupantsWithin(Position centre, int radius) {
-        return IntStream.rangeClosed(centre.getRow() - radius, centre.getRow() + radius)
-            .boxed()
-            .flatMap(row -> IntStream.rangeClosed(centre.getColumn() - radius, centre.getColumn() + radius)
-                .mapToObj(column -> new Position(row, column)))
-            .filter(position -> !position.equals(centre))
+        return squareAround(centre, radius)
             .map(this::at)
             .flatMap(Optional::stream);
     }
 
     /** The cells surrounding a position, in random order. */
     public List<Position> neighboursOf(Position position, Random random) {
-        List<Position> neighbours = new ArrayList<>();
-        for (int rowChange = -1; rowChange <= 1; rowChange++) {
-            for (int columnChange = -1; columnChange <= 1; columnChange++) {
-                if (rowChange == 0 && columnChange == 0) {
-                    continue;
-                }
-                Position candidate = position.offsetBy(rowChange, columnChange);
-                if (contains(candidate)) {
-                    neighbours.add(candidate);
-                }
-            }
-        }
+        List<Position> neighbours = squareAround(position, 1)
+            .filter(this::contains)
+            .collect(Collectors.toCollection(ArrayList::new));
         Collections.shuffle(neighbours, random);
         return neighbours;
     }
 
-    /** Every position on the grid, empty or not. */
+    /**
+     * Every position in a square around a centre, not counting the centre itself
+     * and not checked against the edges of the grid.
+     */
+    private Stream<Position> squareAround(Position centre, int radius) {
+        return IntStream.rangeClosed(-radius, radius)
+            .boxed()
+            .flatMap(rowChange -> IntStream.rangeClosed(-radius, radius)
+                .mapToObj(columnChange -> centre.offsetBy(rowChange, columnChange)))
+            .filter(position -> !position.equals(centre));
+    }
+
+    /** Every position on the grid, empty or not, in row order. */
     public List<Position> allPositions() {
-        List<Position> positions = new ArrayList<>();
-        for (int row = 0; row < rows; row++) {
-            for (int column = 0; column < columns; column++) {
-                positions.add(new Position(row, column));
-            }
-        }
-        return positions;
+        return IntStream.range(0, rows * columns)
+            .mapToObj(index -> new Position(index / columns, index % columns))
+            .collect(Collectors.toList());
     }
 }
