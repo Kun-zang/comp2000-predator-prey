@@ -10,12 +10,14 @@ import java.util.function.Supplier;
  *
  * <pre>java Main rows=60 columns=80 seed=42 foxes=0.02 rabbitmove=graze</pre>
  *
+ * Passing steps=N runs N steps without a window and prints a CSV of the populations.
+ *
  * Anything not given keeps its default value. Every setting is checked here, once,
  * so the rest of the program can trust the values it is handed.
  */
 public final class SimulationConfig {
     private static final List<String> KNOWN_KEYS =
-        List.of("rows", "columns", "seed", "grass", "rabbits", "foxes", "rabbitmove", "foxmove");
+        List.of("rows", "columns", "seed", "grass", "rabbits", "foxes", "rabbitmove", "foxmove", "steps");
 
     /**
      * The movement strategies that can be chosen by name. The values are method
@@ -37,10 +39,11 @@ public final class SimulationConfig {
     private final double foxChance;
     private final String rabbitMove;
     private final String foxMove;
+    private final int headlessSteps;
 
     private SimulationConfig(int rows, int columns, long seed,
                              double grassChance, double rabbitChance, double foxChance,
-                             String rabbitMove, String foxMove) {
+                             String rabbitMove, String foxMove, int headlessSteps) {
         this.rows = rows;
         this.columns = columns;
         this.seed = seed;
@@ -49,12 +52,13 @@ public final class SimulationConfig {
         this.foxChance = foxChance;
         this.rabbitMove = rabbitMove;
         this.foxMove = foxMove;
+        this.headlessSteps = headlessSteps;
     }
 
     /** The settings used when nothing is given, with a fresh random seed. */
     public static SimulationConfig defaults() {
         return new SimulationConfig(30, 40, new Random().nextLong(), 0.35, 0.052, 0.012,
-            "cautious", "stalk");
+            "cautious", "stalk", 0);
     }
 
     /**
@@ -75,13 +79,14 @@ public final class SimulationConfig {
         double foxes = chanceSetting(settings, "foxes", fallback.foxChance);
         String rabbitMove = choiceSetting(settings, "rabbitmove", fallback.rabbitMove, RABBIT_MOVES);
         String foxMove = choiceSetting(settings, "foxmove", fallback.foxMove, FOX_MOVES);
+        int steps = intSetting(settings, "steps", fallback.headlessSteps, 0, 1_000_000);
 
         if (grass + rabbits + foxes > 1.0) {
             throw new ConfigurationException(
                 "grass + rabbits + foxes must not add up to more than 1.0, but they add up to "
                 + (grass + rabbits + foxes));
         }
-        return new SimulationConfig(rows, columns, seed, grass, rabbits, foxes, rabbitMove, foxMove);
+        return new SimulationConfig(rows, columns, seed, grass, rabbits, foxes, rabbitMove, foxMove, steps);
     }
 
     private static Map<String, String> parse(String[] args) throws ConfigurationException {
@@ -193,6 +198,11 @@ public final class SimulationConfig {
 
     public String getFoxMove() {
         return foxMove;
+    }
+
+    /** How many steps to run without a window, or 0 to open the window. */
+    public int getHeadlessSteps() {
+        return headlessSteps;
     }
 
     /** A fresh instance of the rabbits' chosen movement strategy. */

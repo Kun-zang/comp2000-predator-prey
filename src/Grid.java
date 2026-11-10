@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.IntStream;
@@ -85,6 +86,11 @@ public class Grid<T extends Entity> {
         if (contains(position)) {
             cells.set(indexOf(position), null);
         }
+    }
+
+    /** A stream of every occupant currently on the grid, in row order. */
+    public Stream<T> stream() {
+        return cells.stream().filter(Objects::nonNull);
     }
 
     /** Every occupant currently on the grid, in row order. */
