@@ -1,16 +1,26 @@
+import java.util.ArrayList;
+import java.util.DoubleSummaryStatistics;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * The world the simulation runs in. Owns the grid and advances time.
+ *
+ * <p>World is also the subject in the Observer pattern: after every step it takes a
+ * census and passes it to each registered SimulationListener.</p>
  */
 public class World {
     private static final double GRASS_REGROWTH_CHANCE = 0.05;
 
     private final Grid<Entity> grid;
     private final Random random;
+    private final List<SimulationListener> listeners = new ArrayList<>();
     private int stepCount = 0;
 
     /**
@@ -47,6 +57,27 @@ public class World {
         return grid.isEmpty(position);
     }
 
+    /** Every entity on the grid, in row order. */
+    public Stream<Entity> entities() {
+        return grid.stream();
+    }
+
+    /**
+     * Energy statistics for each kind of animal: how many there are, and their lowest,
+     * average and highest energy. groupingBy sorts the animals into one group per
+     * species (a TreeMap keeps the species in alphabetical order), and the downstream
+     * collector summarizingDouble works out the statistics within each group.
+     */
+    public Map<String, DoubleSummaryStatistics> energyBySpecies() {
+        return entities()
+            .filter(Animal.class::isInstance)
+            .map(Animal.class::cast)
+            .collect(Collectors.groupingBy(
+                animal -> animal.getClass().getSimpleName(),
+                TreeMap::new,
+                Collectors.summarizingDouble(Animal::getEnergy)));
+    }
+
     /** Every entity an animal at this position could see, up to the given distance away. */
     public Stream<Entity> entitiesNear(Position position, int vision) {
         return grid.occupantsWithin(position, vision);
@@ -81,7 +112,23 @@ public class World {
         grid.put(entity, target);
     }
 
-    /** Advances the simulation by one step: everyone acts, the dead are cleared, grass regrows. */
+    /** Registers an observer to be told about every step from now on. */
+    public void addListener(SimulationListener listener) {
+        listeners.add(Objects.requireNonNull(listener));
+    }
+
+    public void removeListener(SimulationListener listener) {
+        listeners.remove(listener);
+    }
+
+    /**
+     * Advances the simulation by one step: everyone acts, the dead are cleared,
+     * grass regrows, and then every listener is told the new census.
+     *
+     * <p>The acting part must stay sequential. Entities change the shared grid as
+     * they act (moving, eating, giving birth), so two acting at once could both
+     * move into the same empty cell, or both eat the same rabbit.</p>
+     */
     public void step() {
         for (Entity entity : grid.occupants()) {
             if (entity.isAlive()) {
@@ -91,6 +138,25 @@ public class World {
         removeTheDead();
         regrowGrass();
         stepCount++;
+
+        Census census = census();
+        listeners.forEach(listener -> listener.stepCompleted(stepCount, census));
+    }
+
+    /**
+     * Counts everything on the grid, using a parallel stream and the custom
+     * Census collector.
+     *
+     * <p>Why this is thread-safe: it only runs between steps, when nothing is
+     * changing the grid, so the worker threads only ever read; each worker
+     * accumulates into its own Tally (see Census.collector) and the partial results
+     * are merged by the stream framework; and handing work to the fork/join pool
+     * guarantees the workers see every change made before the census started.</p>
+     */
+    public Census census() {
+        return grid.stream()
+            .parallel()
+            .collect(Census.collector());
     }
 
     private void removeTheDead() {
@@ -110,16 +176,6 @@ public class World {
         }
     }
 
-    /** How many entities of a given kind are alive right now. */
-    public int count(Class<? extends Entity> type) {
-        int total = 0;
-        for (Entity entity : grid.occupants()) {
-            if (type.isInstance(entity)) {
-                total++;
-            }
-        }
-        return total;
-    }
 
     /**
      * Scatters a starting population across the grid. The movement strategies are
