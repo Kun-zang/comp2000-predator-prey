@@ -10,13 +10,30 @@ public class Rabbit extends Animal {
     private static final int ENERGY_PER_GRASS = 11;
     private static final int BREEDING_ENERGY = 35;
     private static final int MAXIMUM_AGE = 60;
+    private static final int VISION = 3;
 
-    public Rabbit(Position position) {
-        this(position, STARTING_ENERGY);
+    public Rabbit(Position position, MovementStrategy movement) {
+        this(position, STARTING_ENERGY, movement);
     }
 
-    public Rabbit(Position position, int startingEnergy) {
-        super(position, startingEnergy);
+    public Rabbit(Position position, int startingEnergy, MovementStrategy movement) {
+        super(position, startingEnergy, movement);
+    }
+
+    /** Heads for ripe grass it can see; otherwise wanders. */
+    public static MovementStrategy grazing() {
+        return Movements.towards(Rabbit::isRipeGrass, VISION)
+            .orElse(Movements.randomStep());
+    }
+
+    /** Runs from any fox it can see; otherwise grazes. */
+    public static MovementStrategy cautious() {
+        return Movements.awayFrom(entity -> entity instanceof Fox, VISION)
+            .orElse(grazing());
+    }
+
+    private static boolean isRipeGrass(Entity entity) {
+        return entity instanceof Grass && ((Grass) entity).isMature();
     }
 
     @Override
@@ -27,31 +44,31 @@ public class Rabbit extends Animal {
             return;
         }
         if (!tryToEat(world)) {
-            wander(world);
+            move(world);
         }
         tryToBreed(world, BREEDING_ENERGY);
     }
 
-    /** Looks for mature grass nearby, eats it, and takes over its cell. */
+    /** Looks for mature grass next to it, eats it, and takes over its cell. */
     private boolean tryToEat(World world) {
-        for (Position candidate : world.neighboursOf(getPosition())) {
-            Optional<Entity> occupant = world.entityAt(candidate);
-            if (occupant.isPresent() && occupant.get() instanceof Grass) {
-                Grass grass = (Grass) occupant.get();
-                if (grass.isMature()) {
-                    world.consume(grass);
-                    world.moveEntity(this, candidate);
-                    changeEnergy(ENERGY_PER_GRASS);
-                    return true;
-                }
-            }
-        }
-        return false;
+        Optional<Grass> meal = world.neighboursOf(getPosition()).stream()
+            .map(world::entityAt)
+            .flatMap(Optional::stream)
+            .filter(Grass.class::isInstance)
+            .map(Grass.class::cast)
+            .filter(Grass::isMature)
+            .findFirst();
+        meal.ifPresent(grass -> {
+            world.consume(grass);
+            world.moveEntity(this, grass.getPosition());
+            changeEnergy(ENERGY_PER_GRASS);
+        });
+        return meal.isPresent();
     }
 
     @Override
     protected Animal offspringAt(Position position, int energy) {
-        return new Rabbit(position, energy);
+        return new Rabbit(position, energy, getMovement());
     }
 
     @Override

@@ -1,15 +1,19 @@
-import java.util.List;
-
 /**
  * An entity that moves, ages, and must eat to stay alive.
+ *
+ * <p>How an animal moves is not decided here or in a subclass. It is delegated to a
+ * MovementStrategy the animal is given when it is created (composition rather than
+ * inheritance). Young inherit their parent's strategy.</p>
  */
 public abstract class Animal extends Entity {
+    private final MovementStrategy movement;
     private int energy;
     private int age;
 
-    protected Animal(Position position, int startingEnergy) {
+    protected Animal(Position position, int startingEnergy, MovementStrategy movement) {
         super(position);
         this.energy = startingEnergy;
+        this.movement = movement;
     }
 
     public int getEnergy() {
@@ -18,6 +22,10 @@ public abstract class Animal extends Entity {
 
     public int getAge() {
         return age;
+    }
+
+    public MovementStrategy getMovement() {
+        return movement;
     }
 
     /** Adds or removes energy, and dies if it runs out. */
@@ -36,15 +44,10 @@ public abstract class Animal extends Entity {
         }
     }
 
-    /** Steps into a neighbouring empty cell if there is one. */
-    protected void wander(World world) {
-        List<Position> neighbours = world.neighboursOf(getPosition());
-        for (Position candidate : neighbours) {
-            if (world.isEmpty(candidate)) {
-                world.moveEntity(this, candidate);
-                return;
-            }
-        }
+    /** Asks this animal's strategy where to go, and goes there. */
+    protected void move(World world) {
+        movement.chooseStep(this, world)
+            .ifPresent(target -> world.moveEntity(this, target));
     }
 
     /**
@@ -55,14 +58,14 @@ public abstract class Animal extends Entity {
         if (energy < breedingEnergy) {
             return;
         }
-        for (Position candidate : world.neighboursOf(getPosition())) {
-            if (world.isEmpty(candidate)) {
+        world.neighboursOf(getPosition()).stream()
+            .filter(world::isEmpty)
+            .findFirst()
+            .ifPresent(nursery -> {
                 int passedOn = energy / 2;
                 changeEnergy(-passedOn);
-                world.place(offspringAt(candidate, passedOn));
-                return;
-            }
-        }
+                world.place(offspringAt(nursery, passedOn));
+            });
     }
 
     /** Each species creates its own kind of young. */

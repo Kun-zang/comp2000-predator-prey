@@ -12,13 +12,20 @@ public class Fox extends Animal {
     private static final int BREEDING_ENERGY = 130;
     private static final int MAXIMUM_AGE = 120;
     private static final double CATCH_CHANCE = 0.6;
+    private static final int VISION = 4;
 
-    public Fox(Position position) {
-        this(position, STARTING_ENERGY);
+    public Fox(Position position, MovementStrategy movement) {
+        this(position, STARTING_ENERGY, movement);
     }
 
-    public Fox(Position position, int startingEnergy) {
-        super(position, startingEnergy);
+    public Fox(Position position, int startingEnergy, MovementStrategy movement) {
+        super(position, startingEnergy, movement);
+    }
+
+    /** Stalks the nearest rabbit it can see; otherwise wanders. */
+    public static MovementStrategy stalking() {
+        return Movements.towards(entity -> entity instanceof Rabbit, VISION)
+            .orElse(Movements.randomStep());
     }
 
     @Override
@@ -29,31 +36,36 @@ public class Fox extends Animal {
             return;
         }
         if (!tryToHunt(world)) {
-            wander(world);
+            move(world);
         }
         tryToBreed(world, BREEDING_ENERGY);
     }
 
-    /** Chases a neighbouring rabbit. The rabbit sometimes escapes. */
+    /**
+     * Pounces on a neighbouring rabbit. Each rabbit it tries for may escape.
+     * The random roll sits inside the stream's filter, and streams are lazy, so a
+     * roll is only made for each rabbit actually tried, stopping at the first catch:
+     * the same behaviour as the loop this replaced.
+     */
     private boolean tryToHunt(World world) {
-        for (Position candidate : world.neighboursOf(getPosition())) {
-            Optional<Entity> occupant = world.entityAt(candidate);
-            if (occupant.isPresent() && occupant.get() instanceof Rabbit) {
-                if (world.getRandom().nextDouble() > CATCH_CHANCE) {
-                    continue;
-                }
-                world.consume(occupant.get());
-                world.moveEntity(this, candidate);
-                changeEnergy(ENERGY_PER_RABBIT);
-                return true;
-            }
-        }
-        return false;
+        Optional<Entity> caught = world.neighboursOf(getPosition()).stream()
+            .map(world::entityAt)
+            .flatMap(Optional::stream)
+            .filter(Rabbit.class::isInstance)
+            .filter(rabbit -> world.getRandom().nextDouble() <= CATCH_CHANCE)
+            .findFirst();
+        caught.ifPresent(rabbit -> {
+            Position where = rabbit.getPosition();
+            world.consume(rabbit);
+            world.moveEntity(this, where);
+            changeEnergy(ENERGY_PER_RABBIT);
+        });
+        return caught.isPresent();
     }
 
     @Override
     protected Animal offspringAt(Position position, int energy) {
-        return new Fox(position, energy);
+        return new Fox(position, energy, getMovement());
     }
 
     @Override

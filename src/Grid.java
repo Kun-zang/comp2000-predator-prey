@@ -3,6 +3,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * A rectangular grid of cells, each either empty or holding one occupant.
@@ -94,6 +96,20 @@ public class Grid<T extends Entity> {
             }
         }
         return found;
+    }
+
+    /**
+     * Every occupant within a square of the given radius around a cell, not
+     * counting the cell itself. This is what an animal can "see".
+     */
+    public Stream<T> occupantsWithin(Position centre, int radius) {
+        return IntStream.rangeClosed(centre.getRow() - radius, centre.getRow() + radius)
+            .boxed()
+            .flatMap(row -> IntStream.rangeClosed(centre.getColumn() - radius, centre.getColumn() + radius)
+                .mapToObj(column -> new Position(row, column)))
+            .filter(position -> !position.equals(centre))
+            .map(this::at)
+            .flatMap(Optional::stream);
     }
 
     /** The cells surrounding a position, in random order. */
